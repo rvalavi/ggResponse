@@ -1,5 +1,5 @@
 # create response curves in ggplot
-ggResponse <- function(models, covariates, colPlot=3, responseName="Prediction", ...){
+ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL, responseName="Prediction", ...){
   require(raster)
   require(blockCV)
   require(dplyr)
@@ -74,7 +74,19 @@ ggResponse <- function(models, covariates, colPlot=3, responseName="Prediction",
   for(j in 1:nlayer){
     mydf <- cbind(ranges[,j], meanVars[,-j])
     names(mydf)[1] <- colnames(meanVars)[j]
-    predictions[,j] <- predict(models, mydf, ...)
+    # match the levels
+    if(length(categoricals) > 0){
+      if(is(covariates, "Raster")){
+        for(ct in cats){
+          levels(mydf[,ct]) <- unlist(levels(covariates[[ct]]))
+        }
+      } else{
+        for(ct in cats){
+          levels(mydf[,ct]) <- levels(covariates[,ct])
+        }
+      }
+    }
+    predictions[,j] <- predict(models, mydf, type=type, ...) # the prediction function
   }
   # change the cats to numeric for melting
   if(length(categoricals) > 0){
@@ -88,8 +100,13 @@ ggResponse <- function(models, covariates, colPlot=3, responseName="Prediction",
   prd <- reshape::melt(predictions)
   # nrow(prd); head(prd, 10)
   finaltable <- dplyr::bind_cols(val, prd)
-  yMin <- min(finaltable$value1)
-  yMax <- max(finaltable$value1)
+  if(is.null(zlim)){
+    yMin <- min(finaltable$value1)
+    yMax <- max(finaltable$value1)
+  } else{
+    yMin <- min(zlim)
+    yMax <- max(zlim)
+  }
   if(length(categoricals) > 0){
     for(ct in cats){
       ranges[,ct] <- as.factor(ranges[,ct])
@@ -139,11 +156,6 @@ ggResponse <- function(models, covariates, colPlot=3, responseName="Prediction",
 
 # library(dismo)
 ggResponse(gbm, mydata, colPlot=3, responseName="Prediction", n.trees=gbm$gbm.call$best.trees)
-
-
-
-
-
 
 
 
