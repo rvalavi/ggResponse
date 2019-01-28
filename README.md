@@ -1,4 +1,4 @@
 # ggResponse
 Create response curve for different models in ggplot2.
 
-![Example plot](https://image.ibb.co/eiZSST/Rplot01.jpg)
+![Example plot](https://i.ibb.co/qNnN0YB/gg-Response.jpg)
