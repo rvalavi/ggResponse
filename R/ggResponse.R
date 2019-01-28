@@ -1,5 +1,5 @@
 # create response curves in ggplot
-ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL, responseName="Prediction", ...){
+ggResponse <- function(models, covariates, colPlot=3, responseName="Prediction", ...){
   require(raster)
   require(blockCV)
   require(dplyr)
@@ -12,10 +12,11 @@ ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL
     meanVars <- as.data.frame(meanVars)
     names(meanVars) <- names(covariates)
     ranges <- predictions <- meanVars
-    for(b in 1:nlayer){
-      if(is.factor(covariates[[b]])){
-        n <- n + 1
-        categoricals[n] <- names(covariates)[b]
+    categoricals <- names(covariates)[which(is.factor(covariates))]
+    if(anyNA(maxValue(covariates))){
+      naminmax <- which(is.na(maxValue(covariates)))
+      for(l in naminmax){
+        covariates[[l]] <- raster::setMinMax(covariates[[l]])
       }
     }
     # calculate the means and ranges for non-categorical vars
@@ -74,19 +75,14 @@ ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL
   for(j in 1:nlayer){
     mydf <- cbind(ranges[,j], meanVars[,-j])
     names(mydf)[1] <- colnames(meanVars)[j]
-    # match the levels
-    if(length(categoricals) > 0){
+    for(c in categoricals){
       if(is(covariates, "Raster")){
-        for(ct in cats){
-          levels(mydf[,ct]) <- unlist(levels(covariates[[ct]]))
-        }
+        levels(mydf[, c]) <- as.character(unlist(levels(covariates[[c]])))
       } else{
-        for(ct in cats){
-          levels(mydf[,ct]) <- levels(covariates[,ct])
-        }
+        levels(mydf[, c]) <- levels(covariates[,c])
       }
     }
-    predictions[,j] <- predict(models, mydf, type=type, ...) # the prediction function
+    predictions[,j] <- predict(models, mydf, ...)
   }
   # change the cats to numeric for melting
   if(length(categoricals) > 0){
@@ -100,13 +96,8 @@ ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL
   prd <- reshape::melt(predictions)
   # nrow(prd); head(prd, 10)
   finaltable <- dplyr::bind_cols(val, prd)
-  if(is.null(zlim)){
-    yMin <- min(finaltable$value1)
-    yMax <- max(finaltable$value1)
-  } else{
-    yMin <- min(zlim)
-    yMax <- max(zlim)
-  }
+  yMin <- min(finaltable$value1)
+  yMax <- max(finaltable$value1)
   if(length(categoricals) > 0){
     for(ct in cats){
       ranges[,ct] <- as.factor(ranges[,ct])
@@ -119,7 +110,8 @@ ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL
     down <- k*100-99
     up <- k*100
     pp[[k]] <- ggplot(data=finaltable[down:up,], aes(x=value, y=value1)) + geom_line() + 
-      xlab(toupper(names(covariates)[k])) + scale_y_continuous(name=responseName, limits = c(yMin, yMax))
+      xlab(toupper(names(covariates)[k])) + scale_y_continuous(name=responseName, limits = c(yMin, yMax)) +
+      theme_bw()
   }
   # create plot for categorical variables
   if(length(categoricals) > 0){
@@ -127,7 +119,7 @@ ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL
       lutable <- finaltable[which(finaltable$variable == names(covariates)[ct]),]
       lutable$value <- as.factor(lutable$value)
       catText <- "ggplot(data=lutable, aes(x=value, y=value1)) + geom_point(size=0.1) + 
-      xlab(toupper(names(covariates)[ct])) + scale_y_continuous(name=responseName, limits = c(yMin, yMax)) +"
+      xlab(toupper(names(covariates)[ct])) + scale_y_continuous(name=responseName, limits = c(yMin, yMax)) + theme_bw() +"
       for(i in 1:length(level)){
         n <- n + 1 
         if(i < length(level)){
@@ -156,7 +148,5 @@ ggResponse <- function(models, covariates, colPlot=3, type="response", zlim=NULL
 
 # library(dismo)
 ggResponse(gbm, mydata, colPlot=3, responseName="Prediction", n.trees=gbm$gbm.call$best.trees)
-
-
 
 
